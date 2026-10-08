@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>UNTANGLED – Run your shop without the mess</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="top">
+    <h1>UNTANGLED</h1>
+    <p>Bookings, payments and customers for your salon or barbershop.</p>
+  </header>
+
+  <main>
+    <section class="stats" aria-label="Summary">
+      <div><span id="stat-today">0</span> bookings today</div>
+      <div><span id="stat-unpaid">KES 0</span> still unpaid</div>
+      <div><span id="stat-paid">KES 0</span> collected</div>
+    </section>
+
+    <section class="panel">
+      <h2>Today by staff</h2>
+      <ul id="staff-summary" class="summary"></ul>
+    </section>
+
+    <section class="panel">
+      <h2>Add a booking</h2>
+      <form id="booking-form">
+        <label>Customer name
+          <input id="customer" required placeholder="e.g. Wanjiru Kamau" />
+        </label>
+        <label>Phone (for WhatsApp)
+          <input id="phone" required inputmode="tel" placeholder="0712 345 678" />
+        </label>
+        <label>Service
+          <select id="service" required></select>
+        </label>
+        <label>Staff
+          <select id="staff" required></select>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="walkin" /> Walk-in (starting now)
+        </label>
+        <label id="when-label">Date and time
+          <input id="when" type="datetime-local" required />
+        </label>
+        <label>Price (KES)
+          <input id="price" type="number" min="0" step="50" required />
+        </label>
+        <button type="submit">Save booking</button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>Your bookings</h2>
+      <ul id="booking-list" class="list"></ul>
+      <p id="empty" class="empty">No bookings yet. Add your first one above.</p>
+    </section>
+
+    <details class="panel">
+      <summary>Set up staff and services</summary>
+
+      <h3>Staff</h3>
+      <form id="staff-form" class="row">
+        <input id="new-staff" required placeholder="e.g. Brian" aria-label="Staff name" />
+        <button type="submit">Add staff</button>
+      </form>
+      <ul id="staff-list" class="chips"></ul>
+
+      <h3>Service menu</h3>
+      <form id="service-form" class="row">
+        <input id="new-service" required placeholder="e.g. Kiddies cut" aria-label="Service name" />
+        <input id="new-price" type="number" min="0" step="50" required placeholder="Price" aria-label="Service price" />
+        <button type="submit">Add service</button>
+      </form>
+      <ul id="service-list" class="chips"></ul>
+    </details>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

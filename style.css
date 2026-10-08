@@ -1,0 +1,139 @@
+:root {
+  --ink: #16283a;
+  --paper: #f2f5f7;
+  --white: #ffffff;
+  --teal: #0e7c7b;
+  --sun: #f2b705;
+  --line: #d5dde3;
+  --danger: #b3261e;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+.top {
+  background: var(--ink);
+  color: var(--white);
+  padding: 2rem 1.25rem 1.5rem;
+}
+.top h1 {
+  margin: 0;
+  font-size: clamp(2rem, 8vw, 3.5rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+.top p { margin: 0.25rem 0 0; color: #b9c7d3; }
+
+main { max-width: 760px; margin: 0 auto; padding: 1rem; }
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  margin: -2rem 0 1rem;
+}
+.stats div {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.75rem;
+  font-size: 0.8rem;
+}
+.stats span { display: block; font-size: 1.15rem; font-weight: 800; color: var(--teal); }
+
+.panel {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+.panel h2 { margin: 0 0 0.75rem; font-size: 1.1rem; }
+
+form { display: grid; gap: 0.75rem; }
+label { display: grid; gap: 0.25rem; font-size: 0.85rem; font-weight: 600; }
+input {
+  font: inherit;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+input:focus-visible, button:focus-visible, a:focus-visible {
+  outline: 3px solid var(--sun);
+  outline-offset: 2px;
+}
+
+button, .btn {
+  font: inherit;
+  font-weight: 600;
+  padding: 0.6rem 0.9rem;
+  border: 0;
+  border-radius: 6px;
+  background: var(--teal);
+  color: var(--white);
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+button.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+button.danger { background: transparent; color: var(--danger); border: 1px solid var(--line); }
+
+.list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.75rem; }
+.item { border: 1px solid var(--line); border-radius: 8px; padding: 0.75rem; }
+.item.paid { border-left: 6px solid var(--teal); }
+.item.unpaid { border-left: 6px solid var(--sun); }
+.item h3 { margin: 0; font-size: 1rem; }
+.item .meta { margin: 0.15rem 0 0.6rem; font-size: 0.85rem; color: #51657a; }
+.actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+.empty { color: #51657a; margin: 0; }
+.empty[hidden] { display: none; }
+
+@media (min-width: 640px) {
+  form { grid-template-columns: 1fr 1fr; }
+  form button { grid-column: 1 / -1; }
+}
+
+/* ---- v2: staff, services, status ---- */
+select {
+  font: inherit;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--white);
+  color: var(--ink);
+}
+select:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
+
+label.check { display: flex; align-items: center; gap: 0.5rem; }
+label[hidden] { display: none; }
+
+.summary { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.summary-row {
+  display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+  padding: 0.5rem 0; border-bottom: 1px solid var(--line); font-size: 0.9rem;
+}
+.summary-row:last-child { border-bottom: 0; }
+
+.item.no-show { opacity: 0.55; border-left-color: var(--line); }
+
+details.panel summary { font-weight: 800; cursor: pointer; }
+details.panel h3 { margin: 1rem 0 0.5rem; font-size: 0.95rem; }
+.row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.row input { flex: 1 1 8rem; }
+form.row { display: flex; }
+
+.chips { list-style: none; margin: 0.6rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.chip {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  background: var(--paper); border: 1px solid var(--line);
+  border-radius: 999px; padding: 0.2rem 0.3rem 0.2rem 0.75rem; font-size: 0.85rem;
+}
+.chip-x { background: transparent; color: var(--ink); padding: 0 0.5rem; font-size: 1.1rem; line-height: 1.4; }
