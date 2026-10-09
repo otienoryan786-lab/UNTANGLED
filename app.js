@@ -1,12 +1,10 @@
 // UNTANGLED – Phase 1 (salons & barbershops)
-// Bookings, staff, service menu, walk-ins, status, payments, WhatsApp reminders.
-// Data lives in the browser (localStorage). No backend yet.
-
-const KEYS = {
-  bookings: "untangled.bookings",
-  staff: "untangled.staff",
-  services: "untangled.services",
-};
+// Bookings, staff, service menu, staff-services, durations, double-booking
+// protection, walk-ins, status, cash/M-Pesa payments, free-time view and
+// WhatsApp reminders.
+//
+// All data goes through store.js. When we choose a backend, only store.js changes.
+// Look for "[STAFF]" comments: everything to do with staff.
 
 const STATUSES = [
   ["booked", "Booked"],
@@ -15,37 +13,43 @@ const STATUSES = [
   ["no-show", "No-show"],
 ];
 
-// ---------- State ----------
-function loadJSON(key, fallback) {
+const MIN_GAP_MINUTES = 30; // free gaps shorter than this aren't shown
+const MPESA_CODE = /^[A-Z0-9]{10}$/; // M-Pesa codes are 10 letters/digits
+
+// ======================================================================
+// State: a copy of what's in the store, refreshed after every change
+// ======================================================================
+
+let bookings = [];
+let staff = [];
+let services = [];
+let settings = { open: "08:00", close: "19:00" };
+
+async function refresh() {
+  ({ bookings, staff, services, settings } = await store.loadAll());
+  render();
+}
+
+// Runs a change, then reloads and redraws. One place to handle failures.
+async function run(action) {
   try {
-    return JSON.parse(localStorage.getItem(key)) || fallback;
-  } catch {
-    return fallback;
+    await action();
+    await refresh();
+  } catch (err) {
+    console.error(err);
+    alert("Something went wrong and your change was not saved. Please try again.");
   }
 }
-function saveAll() {
-  localStorage.setItem(KEYS.bookings, JSON.stringify(bookings));
-  localStorage.setItem(KEYS.staff, JSON.stringify(staff));
-  localStorage.setItem(KEYS.services, JSON.stringify(services));
-}
 
-let staff = loadJSON(KEYS.staff, ["Me"]);
-let services = loadJSON(KEYS.services, [
-  { name: "Haircut", price: 300 },
-  { name: "Shave", price: 150 },
-  { name: "Haircut + shave", price: 400 },
-]);
-let bookings = loadJSON(KEYS.bookings, []).map((b) => ({
-  staff: staff[0], // older bookings from the first version had no staff/status
-  status: "booked",
-  ...b,
-}));
+// ======================================================================
+// Helpers
+// ======================================================================
 
-// ---------- Helpers ----------
 const $ = (id) => document.getElementById(id);
 const kes = (n) => "KES " + Number(n).toLocaleString("en-KE");
 const fmtWhen = (iso) =>
   new Date(iso).toLocaleString("en-KE", { dateStyle: "medium", timeStyle: "short" });
+const fmtTime = (ms) => new Date(ms).toLocaleTimeString("en-KE", { timeStyle: "short" });
 
 // Builds elements with textContent (never innerHTML) so typed input can't inject HTML.
 function el(tag, className, text) {
@@ -79,40 +83,162 @@ function nowLocalISO() {
   return d.toISOString().slice(0, 16);
 }
 
-// ---------- Booking actions ----------
-function addBooking(data) {
-  bookings.push({
+// [STAFF] Who can do this service?
+const staffFor = (serviceName) => staff.filter((s) => s.services.includes(serviceName));
+
+// Two bookings clash when each starts before the other ends.
+const startMs = (b) => new Date(b.when).getTime();
+const endMs = (b) => startMs(b) + b.duration * 60000;
+
+function findClash(staffName, whenISO, duration) {
+  const start = new Date(whenISO).getTime();
+  const end = start + duration * 60000;
+  return bookings.find(
+    (b) => b.staff === staffName && b.status !== "no-show" && start < endMs(b) && end > startMs(b)
+  );
+}
+
+// Free time left today for one person: gaps between bookings, from now until closing.
+// No-shows don't block time, so a no-show shows up as a gap you can fill.
+function freeSlots(staffName) {
+  const at = (hhmm) => {
+    const [h, m] = hhmm.split(":").map(Number);
+    const d = new Date();
+    d.setHours(h, m, 0, 0);
+    return d.getTime();
+  };
+  const closing = at(settings.close);
+  const minGap = MIN_GAP_MINUTES * 60000;
+
+  let cursor = Math.max(at(settings.open), Date.now());
+  const gaps = [];
+  const mine = bookings
+    .filter((b) => b.staff === staffName && isToday(b.when) && b.status !== "no-show")
+    .sort((a, b) => startMs(a) - startMs(b));
+
+  for (const b of mine) {
+    if (startMs(b) - cursor >= minGap) gaps.push([cursor, startMs(b)]);
+    cursor = Math.max(cursor, endMs(b));
+  }
+  if (closing - cursor >= minGap) gaps.push([cursor, closing]);
+  return gaps;
+}
+
+const payLabel = (b) =>
+  !b.paid ? "Not paid" : b.payMethod === "mpesa" ? `Paid · M-Pesa ${b.mpesaCode}` : b.payMethod === "cash" ? "Paid · Cash" : "Paid";
+
+// ======================================================================
+// Actions (each one goes through run(): change the store, then redraw)
+// ======================================================================
+
+// Returns { ok, message }. Clashes block scheduled bookings; walk-ins can override.
+async function addBooking(data) {
+  const when = data.walkIn ? nowLocalISO() : data.when;
+  const duration = Number(data.duration);
+
+  const clash = findClash(data.staff, when, duration);
+  if (clash) {
+    const msg = `${data.staff} is busy with ${clash.customer} (${fmtWhen(clash.when)}, ${clash.duration} min).`;
+    if (!data.walkIn) {
+      return { ok: false, message: msg + " Pick another time or another staff member." };
+    }
+    if (!confirm(msg + " Add this walk-in anyway?")) return { ok: false };
+  }
+
+  await store.addBooking({
     id: crypto.randomUUID(),
     customer: data.customer.trim(),
     phone: data.phone.trim(),
     service: data.service,
     staff: data.staff,
-    when: data.walkIn ? nowLocalISO() : data.when,
+    when,
+    duration,
     price: Number(data.price),
     status: data.walkIn ? "in-chair" : "booked",
     walkIn: data.walkIn,
     paid: false,
+    payMethod: null,
+    mpesaCode: "",
   });
-  bookings.sort((a, b) => new Date(a.when) - new Date(b.when));
-  saveAll();
-  render();
+  return { ok: true };
 }
 
-function updateBooking(id, changes) {
-  const b = bookings.find((x) => x.id === id);
-  if (b) Object.assign(b, changes);
-  saveAll();
-  render();
-}
+const updateBooking = (id, changes) => run(() => store.updateBooking(id, changes));
 
 function removeBooking(id) {
-  if (!confirm("Delete this booking?")) return;
-  bookings = bookings.filter((x) => x.id !== id);
-  saveAll();
-  render();
+  if (confirm("Delete this booking?")) run(() => store.removeBooking(id));
 }
 
-// ---------- Rendering: bookings ----------
+// [STAFF] Staff actions
+function addStaff(name) {
+  if (name) run(() => store.addStaff(name));
+}
+
+function removeStaff(name) {
+  if (staff.length === 1) return alert("Keep at least one staff member.");
+  run(() => store.removeStaff(name));
+}
+
+// Ticking a box shouldn't redraw the whole setup panel (you'd lose your place),
+// so we only reload the data and refresh the booking form's dropdowns.
+async function setStaffService(member, serviceName, does) {
+  try {
+    await store.setStaffService(member.name, serviceName, does);
+    ({ staff } = await store.loadAll());
+    renderFormOptions();
+  } catch (err) {
+    console.error(err);
+    alert("Couldn't save that change. Please try again.");
+  }
+}
+
+const addService = (name, price, duration) =>
+  name && run(() => store.addService({ name, price, duration }));
+const removeService = (name) => run(() => store.removeService(name));
+
+// ======================================================================
+// Payment dialog
+// ======================================================================
+
+let payingId = null;
+
+function openPayDialog(b) {
+  payingId = b.id;
+  $("pay-summary").textContent = `${b.customer} – ${b.service} – ${kes(b.price)}`;
+  $("pay-method").value = "cash";
+  $("pay-code").value = "";
+  $("pay-code-label").hidden = true;
+  $("pay-code").required = false;
+  $("pay-dialog").showModal();
+}
+
+function savePayment() {
+  const method = $("pay-method").value;
+  const code = $("pay-code").value.trim().toUpperCase();
+
+  if (method === "mpesa") {
+    if (!MPESA_CODE.test(code)) {
+      return alert("Enter the 10-character M-Pesa code from the SMS, e.g. SJK3L9XY2P.");
+    }
+    // The same SMS can't pay for two bookings.
+    const used = bookings.find((b) => b.id !== payingId && b.mpesaCode === code);
+    if (used) {
+      return alert(`That M-Pesa code is already recorded for ${used.customer}'s ${used.service}.`);
+    }
+  }
+
+  $("pay-dialog").close();
+  updateBooking(payingId, {
+    paid: true,
+    payMethod: method,
+    mpesaCode: method === "mpesa" ? code : "",
+  });
+}
+
+// ======================================================================
+// Rendering: bookings and summaries
+// ======================================================================
+
 function renderItem(b) {
   const cls = ["item", b.paid ? "paid" : "unpaid"];
   if (b.status === "no-show") cls.push("no-show");
@@ -123,7 +249,7 @@ function renderItem(b) {
     el(
       "p",
       "meta",
-      `${b.walkIn ? "Walk-in · " : ""}${fmtWhen(b.when)} · ${b.staff} · ${kes(b.price)} · ${b.paid ? "Paid" : "Not paid"}`
+      `${b.walkIn ? "Walk-in · " : ""}${fmtWhen(b.when)} (${b.duration} min) · ${b.staff} · ${kes(b.price)} · ${payLabel(b)}`
     )
   );
 
@@ -144,8 +270,11 @@ function renderItem(b) {
   remind.target = "_blank";
   remind.rel = "noopener";
 
-  const pay = el("button", "ghost", b.paid ? "Mark as unpaid" : "Mark as paid");
-  pay.addEventListener("click", () => updateBooking(b.id, { paid: !b.paid }));
+  const pay = el("button", "ghost", b.paid ? "Mark as unpaid" : "Record payment");
+  pay.addEventListener("click", () => {
+    if (b.paid) updateBooking(b.id, { paid: false, payMethod: null, mpesaCode: "" });
+    else openPayDialog(b);
+  });
 
   const del = el("button", "danger", "Delete");
   del.addEventListener("click", () => removeBooking(b.id));
@@ -156,11 +285,10 @@ function renderItem(b) {
 }
 
 function renderStaffSummary() {
-  const list = $("staff-summary");
   const today = bookings.filter((b) => isToday(b.when) && b.status !== "no-show");
-  const names = [...new Set([...staff, ...today.map((b) => b.staff)])];
+  const names = [...new Set([...staff.map((s) => s.name), ...today.map((b) => b.staff)])];
 
-  list.replaceChildren(
+  $("staff-summary").replaceChildren(
     ...names.map((name) => {
       const mine = today.filter((b) => b.staff === name);
       const paid = mine.filter((b) => b.paid).reduce((s, b) => s + b.price, 0);
@@ -168,6 +296,17 @@ function renderStaffSummary() {
       const li = el("li", "summary-row");
       li.append(el("strong", "", name));
       li.append(el("span", "", `${mine.length} clients · ${kes(paid)} paid · ${kes(owed)} owed`));
+
+      const gaps = freeSlots(name);
+      li.append(
+        el(
+          "div",
+          "free",
+          gaps.length
+            ? "Free: " + gaps.map(([a, b]) => `${fmtTime(a)}–${fmtTime(b)}`).join(", ")
+            : "No free time left today"
+        )
+      );
       return li;
     })
   );
@@ -182,7 +321,18 @@ function renderStats() {
   $("stat-unpaid").textContent = kes(unpaid);
 }
 
-// ---------- Rendering: setup + form selects ----------
+// Cash vs M-Pesa for today, so the owner can match the till and the phone at closing.
+function renderTakings() {
+  const paidToday = bookings.filter((b) => isToday(b.when) && b.paid);
+  const total = (method) =>
+    paidToday.filter((b) => b.payMethod === method).reduce((s, b) => s + b.price, 0);
+  $("takings").textContent = `Today's takings – Cash ${kes(total("cash"))} · M-Pesa ${kes(total("mpesa"))}`;
+}
+
+// ======================================================================
+// Rendering: setup panel
+// ======================================================================
+
 function chip(label, onRemove) {
   const li = el("li", "chip");
   li.append(el("span", "", label));
@@ -193,50 +343,88 @@ function chip(label, onRemove) {
   return li;
 }
 
-function renderSetup() {
-  $("staff-list").replaceChildren(
-    ...staff.map((name) =>
-      chip(name, () => {
-        if (staff.length === 1) return alert("Keep at least one staff member.");
-        staff = staff.filter((s) => s !== name);
-        saveAll();
-        render();
-      })
-    )
-  );
+function renderServiceSetup() {
   $("service-list").replaceChildren(
     ...services.map((s) =>
-      chip(`${s.name} – ${kes(s.price)}`, () => {
-        services = services.filter((x) => x.name !== s.name);
-        saveAll();
-        render();
-      })
+      chip(`${s.name} – ${kes(s.price)} · ${s.duration} min`, () => removeService(s.name))
     )
   );
 }
 
-function fillSelect(select, values) {
-  const previous = select.value;
-  select.replaceChildren(
-    ...values.map((v) => {
-      const opt = el("option", "", v);
-      opt.value = v;
-      return opt;
+// [STAFF] One card per person, with a tick box for every service on the menu.
+function renderStaffSetup() {
+  $("staff-list").replaceChildren(
+    ...staff.map((member) => {
+      const card = el("li", "staff-card");
+
+      const head = el("div", "staff-head");
+      head.append(el("strong", "", member.name));
+      const rm = el("button", "danger small", "Remove");
+      rm.addEventListener("click", () => removeStaff(member.name));
+      head.append(rm);
+      card.append(head);
+
+      const checks = el("div", "service-checks");
+      for (const s of services) {
+        const label = el("label", "check");
+        const cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = member.services.includes(s.name);
+        cb.addEventListener("change", () => setStaffService(member, s.name, cb.checked));
+        label.append(cb, document.createTextNode(" " + s.name));
+        checks.append(label);
+      }
+      card.append(checks);
+      return card;
     })
   );
+}
+
+function renderHours() {
+  $("open").value = settings.open;
+  $("close").value = settings.close;
+}
+
+// ======================================================================
+// Rendering: booking form dropdowns
+// ======================================================================
+
+function fillSelect(select, values, emptyText) {
+  const previous = select.value;
+  const options = values.length
+    ? values.map((v) => {
+        const opt = el("option", "", v);
+        opt.value = v;
+        return opt;
+      })
+    : [Object.assign(el("option", "", emptyText), { value: "" })];
+  select.replaceChildren(...options);
   if (values.includes(previous)) select.value = previous;
 }
 
-function renderFormOptions() {
-  fillSelect($("service"), services.map((s) => s.name));
-  fillSelect($("staff"), staff);
-  if (!$("price").value) syncPrice();
+// [STAFF] The staff dropdown only shows people who do the chosen service.
+function refreshStaffOptions() {
+  fillSelect(
+    $("staff"),
+    staffFor($("service").value).map((s) => s.name),
+    "No staff offer this service"
+  );
 }
 
-// Picking a service fills in its menu price (you can still change it).
-function syncPrice() {
+// Picking a service fills in its menu price and duration (you can still change them).
+function syncFromService() {
   const s = services.find((x) => x.name === $("service").value);
-  if (s) $("price").value = s.price;
+  if (s) {
+    $("price").value = s.price;
+    $("duration").value = s.duration;
+  }
+  refreshStaffOptions();
+}
+
+function renderFormOptions() {
+  fillSelect($("service"), services.map((s) => s.name), "Add a service in setup");
+  refreshStaffOptions();
+  if (!$("price").value) syncFromService();
 }
 
 function render() {
@@ -244,12 +432,18 @@ function render() {
   $("empty").hidden = bookings.length > 0;
   renderStats();
   renderStaffSummary();
-  renderSetup();
+  renderTakings();
+  renderServiceSetup();
+  renderStaffSetup();
+  renderHours();
   renderFormOptions();
 }
 
-// ---------- Wiring ----------
-$("service").addEventListener("change", syncPrice);
+// ======================================================================
+// Wiring
+// ======================================================================
+
+$("service").addEventListener("change", syncFromService);
 
 $("walkin").addEventListener("change", () => {
   const walkIn = $("walkin").checked;
@@ -257,42 +451,72 @@ $("walkin").addEventListener("change", () => {
   $("when").required = !walkIn;
 });
 
-$("booking-form").addEventListener("submit", (e) => {
+$("booking-form").addEventListener("submit", async (e) => {
   e.preventDefault();
-  addBooking({
-    customer: $("customer").value,
-    phone: $("phone").value,
-    service: $("service").value,
-    staff: $("staff").value,
-    when: $("when").value,
-    price: $("price").value,
-    walkIn: $("walkin").checked,
-  });
-  e.target.reset();
+  const form = e.currentTarget;
+  let result;
+  try {
+    result = await addBooking({
+      customer: $("customer").value,
+      phone: $("phone").value,
+      service: $("service").value,
+      staff: $("staff").value,
+      when: $("when").value,
+      price: $("price").value,
+      duration: $("duration").value,
+      walkIn: $("walkin").checked,
+    });
+  } catch (err) {
+    console.error(err);
+    return alert("Something went wrong and the booking was not saved. Please try again.");
+  }
+  if (!result.ok) {
+    if (result.message) alert(result.message);
+    return; // keep what was typed so the time or staff can be adjusted
+  }
+  form.reset();
   $("when-label").hidden = false;
   $("when").required = true;
   $("price").value = "";
-  render();
+  $("duration").value = "";
+  await refresh();
 });
 
+// [STAFF] Add-staff form
 $("staff-form").addEventListener("submit", (e) => {
   e.preventDefault();
-  const name = $("new-staff").value.trim();
-  if (name && !staff.includes(name)) staff.push(name);
-  e.target.reset();
-  saveAll();
-  render();
+  addStaff($("new-staff").value.trim());
+  e.currentTarget.reset();
 });
 
 $("service-form").addEventListener("submit", (e) => {
   e.preventDefault();
-  const name = $("new-service").value.trim();
-  if (name && !services.some((s) => s.name === name)) {
-    services.push({ name, price: Number($("new-price").value) });
-  }
-  e.target.reset();
-  saveAll();
-  render();
+  addService(
+    $("new-service").value.trim(),
+    Number($("new-price").value),
+    Number($("new-duration").value)
+  );
+  e.currentTarget.reset();
 });
 
-render();
+$("hours-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const open = $("open").value;
+  const close = $("close").value;
+  if (open >= close) return alert("Closing time must be after opening time.");
+  run(() => store.saveSettings({ open, close }));
+});
+
+// Payment dialog
+$("pay-method").addEventListener("change", () => {
+  const mpesa = $("pay-method").value === "mpesa";
+  $("pay-code-label").hidden = !mpesa;
+  $("pay-code").required = mpesa;
+});
+$("pay-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  savePayment();
+});
+$("pay-cancel").addEventListener("click", () => $("pay-dialog").close());
+
+refresh();

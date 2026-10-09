@@ -11,7 +11,7 @@
 </head>
 <body>
   <header class="top">
-    <h1>UNTANGLED</h1>
+    <h1>Untangled</h1>
     <p>Bookings, payments and customers for your salon or barbershop.</p>
   </header>
 
@@ -25,9 +25,11 @@
     <section class="panel">
       <h2>Today by staff</h2>
       <ul id="staff-summary" class="summary"></ul>
+      <p id="takings" class="meta"></p>
     </section>
 
     <section class="panel">
+      <h2>Add a booking</h2>
       <form id="booking-form">
         <label>Customer name
           <input id="customer" required placeholder="e.g. Wanjiru Kamau" />
@@ -38,6 +40,7 @@
         <label>Service
           <select id="service" required></select>
         </label>
+        <!-- [STAFF] This dropdown only lists staff who do the chosen service. -->
         <label>Staff
           <select id="staff" required></select>
         </label>
@@ -50,6 +53,9 @@
         <label>Price (KES)
           <input id="price" type="number" min="0" step="50" required />
         </label>
+        <label>Duration (minutes)
+          <input id="duration" type="number" min="5" step="5" required />
+        </label>
         <button type="submit">Save booking</button>
       </form>
     </section>
@@ -61,25 +67,56 @@
     </section>
 
     <details class="panel">
-      <summary>Set up staff and services</summary>
+      <summary>Set up staff, services and hours</summary>
 
-      <h3>Staff</h3>
-      <form id="staff-form" class="row">
-        <input id="new-staff" required placeholder="e.g. Brian" aria-label="Staff name" />
-        <button type="submit">Add staff</button>
+      <h3>Opening hours</h3>
+      <form id="hours-form" class="row">
+        <label>Opens <input id="open" type="time" required /></label>
+        <label>Closes <input id="close" type="time" required /></label>
+        <button type="submit">Save hours</button>
       </form>
-      <ul id="staff-list" class="chips"></ul>
 
       <h3>Service menu</h3>
       <form id="service-form" class="row">
         <input id="new-service" required placeholder="e.g. Kiddies cut" aria-label="Service name" />
         <input id="new-price" type="number" min="0" step="50" required placeholder="Price" aria-label="Service price" />
+        <input id="new-duration" type="number" min="5" step="5" required placeholder="Minutes" aria-label="Service duration in minutes" />
         <button type="submit">Add service</button>
       </form>
       <ul id="service-list" class="chips"></ul>
+
+      <!-- [STAFF] Each staff card has tick boxes for the services that person does. -->
+      <h3>Staff and what they do</h3>
+      <form id="staff-form" class="row">
+        <input id="new-staff" required placeholder="e.g. Brian" aria-label="Staff name" />
+        <button type="submit">Add staff</button>
+      </form>
+      <ul id="staff-list" class="staff-cards"></ul>
     </details>
   </main>
 
+  <!-- Record a payment: cash or M-Pesa (with the transaction code) -->
+  <dialog id="pay-dialog">
+    <form id="pay-form">
+      <h2>Record payment</h2>
+      <p id="pay-summary" class="meta"></p>
+      <label>Paid by
+        <select id="pay-method">
+          <option value="cash">Cash</option>
+          <option value="mpesa">M-Pesa</option>
+        </select>
+      </label>
+      <label id="pay-code-label" hidden>M-Pesa code (from the SMS)
+        <input id="pay-code" maxlength="10" autocomplete="off" placeholder="e.g. SJK3L9XY2P" />
+      </label>
+      <div class="actions">
+        <button type="submit">Save payment</button>
+        <button type="button" class="ghost" id="pay-cancel">Cancel</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="store.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
