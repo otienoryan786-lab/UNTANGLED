@@ -124,8 +124,13 @@ function freeSlots(staffName) {
   return gaps;
 }
 
-const payLabel = (b) =>
-  !b.paid ? "Not paid" : b.payMethod === "mpesa" ? `Paid · M-Pesa ${b.mpesaCode}` : b.payMethod === "cash" ? "Paid · Cash" : "Paid";
+const payLabel = (b) => {
+  if (!b.paid) return "Not paid";
+  if (b.payMethod === "loyalty") return "Free (loyalty reward)";
+  if (b.payMethod === "mpesa") return `Paid · M-Pesa ${b.mpesaCode}`;
+  if (b.payMethod === "cash") return "Paid · Cash";
+  return "Paid";
+};
 
 // ======================================================================
 // Actions (each one goes through run(): change the store, then redraw)
@@ -153,11 +158,12 @@ async function addBooking(data) {
     staff: data.staff,
     when,
     duration,
-    price: Number(data.price),
+    price: data.reward ? 0 : Number(data.price),
     status: data.walkIn ? "in-chair" : "booked",
     walkIn: data.walkIn,
-    paid: false,
-    payMethod: null,
+    reward: data.reward, // a free loyalty visit is settled straight away
+    paid: data.reward,
+    payMethod: data.reward ? "loyalty" : null,
     mpesaCode: "",
   });
   return { ok: true };
@@ -327,6 +333,214 @@ function renderTakings() {
   const total = (method) =>
     paidToday.filter((b) => b.payMethod === method).reduce((s, b) => s + b.price, 0);
   $("takings").textContent = `Today's takings – Cash ${kes(total("cash"))} · M-Pesa ${kes(total("mpesa"))}`;
+}
+
+// ======================================================================
+// Customers and loyalty
+// A "customer" is everyone who shares a phone number. Nothing extra is stored:
+// we work it out from the bookings. [PHASE 2] this becomes the customers table.
+// A "visit" is a booking that has started and wasn't a no-show.
+// ======================================================================
+
+const DAY_MS = 86400000;
+const LAPSED_DAYS = 30;
+const REGULAR_VISITS = 3;
+
+let customerList = [];
+const openCustomers = new Set(); // which customer cards are expanded
+
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+const fmtDate = (ms) => new Date(ms).toLocaleDateString("en-KE", { dateStyle: "medium" });
+const statusName = Object.fromEntries(STATUSES);
+
+function mostCommon(values) {
+  const counts = {};
+  for (const v of values) counts[v] = (counts[v] || 0) + 1;
+  const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+  return top ? top[0] : null;
+}
+
+function buildCustomers() {
+  const now = Date.now();
+  const byPhone = new Map();
+  for (const b of bookings) {
+    const key = toInternational(b.phone);
+    if (!byPhone.has(key)) byPhone.set(key, []);
+    byPhone.get(key).push(b);
+  }
+
+  return [...byPhone.entries()]
+    .map(([key, list]) => {
+      const history = list.slice().sort((a, b) => startMs(b) - startMs(a)); // newest first
+      const visits = history.filter((b) => b.status !== "no-show" && startMs(b) <= now);
+      return {
+        key,
+        name: history[0].customer,
+        phone: history[0].phone,
+        history,
+        visits: visits.length,
+        noShows: history.filter((b) => b.status === "no-show").length,
+        lastVisit: visits.length ? startMs(visits[0]) : null,
+        lastActivity: startMs(history[0]),
+        spent: visits.reduce((sum, b) => sum + b.price, 0),
+        favService: mostCommon(visits.map((b) => b.service)),
+        favStaff: mostCommon(visits.map((b) => b.staff)),
+      };
+    })
+    .sort((a, b) => b.lastActivity - a.lastActivity);
+}
+
+// With "every 5th visit is free": 4 visits done means the next one (the 5th) is free.
+function loyaltyFor(visits) {
+  const n = settings.loyaltyEvery;
+  if (!n) return null;
+  const toGo = n - 1 - (visits % n); // visits still needed before the free one
+  return { n, toGo, due: toGo === 0 };
+}
+
+const daysSinceLastVisit = (c) =>
+  c.lastVisit === null ? null : Math.floor((Date.now() - c.lastVisit) / DAY_MS);
+const isLapsed = (c) => daysSinceLastVisit(c) !== null && daysSinceLastVisit(c) > LAPSED_DAYS;
+
+function matchesFilter(c, filter) {
+  if (filter === "regulars") return c.visits >= REGULAR_VISITS;
+  if (filter === "lapsed") return isLapsed(c);
+  if (filter === "reward") return !!(loyaltyFor(c.visits) && loyaltyFor(c.visits).due);
+  return true;
+}
+
+function matchesSearch(c, query) {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const digits = q.replace(/\D/g, "").replace(/^0/, ""); // 0712... matches 254712...
+  return c.name.toLowerCase().includes(q) || (digits.length > 0 && c.key.includes(digits));
+}
+
+function customerMessage(c) {
+  const first = c.name.split(" ")[0];
+  const loy = loyaltyFor(c.visits);
+  if (loy && loy.due) {
+    return {
+      label: "Offer free visit on WhatsApp",
+      text: `Hi ${first}, thank you for being a regular! Your next visit${c.favService ? ` (${c.favService})` : ""} is on us. Message us to book your slot.`,
+    };
+  }
+  if (isLapsed(c)) {
+    return {
+      label: "Send win-back message",
+      text: `Hi ${first}, it's been a while since your last visit and we'd love to see you again! Message us to book your next slot.`,
+    };
+  }
+  return { label: "Message on WhatsApp", text: `Hi ${first}, ` };
+}
+
+function renderCustomer(c) {
+  const li = el("li", "item customer-card");
+  const details = document.createElement("details");
+  details.open = openCustomers.has(c.key);
+  details.addEventListener("toggle", () =>
+    details.open ? openCustomers.add(c.key) : openCustomers.delete(c.key)
+  );
+
+  const loy = loyaltyFor(c.visits);
+  const summary = document.createElement("summary");
+  const top = el("div", "cust-top");
+  top.append(el("strong", "", c.name));
+  if (loy && loy.due) top.append(el("span", "badge reward", "Free visit due"));
+  else if (isLapsed(c)) top.append(el("span", "badge lapsed", `Not seen in ${daysSinceLastVisit(c)} days`));
+  summary.append(top);
+  summary.append(
+    el(
+      "div",
+      "meta",
+      `${plural(c.visits, "visit")} · ${kes(c.spent)} spent · last visit ${c.lastVisit ? fmtDate(c.lastVisit) : "none yet"}`
+    )
+  );
+  details.append(summary);
+
+  const body = el("div", "cust-body");
+  const usual = [];
+  if (c.favService) usual.push(`Usually ${c.favService}` + (c.favStaff ? ` with ${c.favStaff}` : ""));
+  if (c.noShows) usual.push(plural(c.noShows, "no-show"));
+  body.append(el("p", "meta", [c.phone, ...usual].join(" · ")));
+
+  if (loy) {
+    body.append(
+      el(
+        "p",
+        "meta",
+        loy.due ? "Loyalty: the next visit is free." : `Loyalty: ${plural(loy.toGo, "more visit")} until a free one.`
+      )
+    );
+  }
+
+  const msg = customerMessage(c);
+  const link = el("a", "btn", msg.label);
+  link.href = `https://wa.me/${c.key}?text=${encodeURIComponent(msg.text)}`;
+  link.target = "_blank";
+  link.rel = "noopener";
+  const actions = el("div", "actions");
+  actions.append(link);
+  body.append(actions);
+
+  const history = el("ul", "history");
+  for (const b of c.history.slice(0, 15)) {
+    history.append(
+      el(
+        "li",
+        "",
+        `${fmtWhen(b.when)} · ${b.service} · ${b.staff} · ${kes(b.price)} · ${statusName[b.status] || b.status}${b.reward ? " · loyalty reward" : ""}`
+      )
+    );
+  }
+  body.append(history);
+  if (c.history.length > 15) body.append(el("p", "meta", `Showing the latest 15 of ${c.history.length} bookings.`));
+
+  details.append(body);
+  li.append(details);
+  return li;
+}
+
+function renderCustomers() {
+  const shown = customerList.filter(
+    (c) => matchesFilter(c, $("customer-filter").value) && matchesSearch(c, $("customer-search").value)
+  );
+  $("customer-list").replaceChildren(...shown.map(renderCustomer));
+  $("customers-empty").hidden = shown.length > 0;
+  $("customers-empty").textContent = customerList.length
+    ? "No customers match this search."
+    : "Customers will appear here after your first booking.";
+}
+
+function renderLoyaltySettings() {
+  $("loyalty-every").value = settings.loyaltyEvery;
+}
+
+// In the booking form: when the phone number matches someone we know, say so,
+// and offer the loyalty reward if their next visit is due to be free.
+function updateCustomerHint(autofill = false) {
+  const hint = $("customer-hint");
+  const digits = $("phone").value.replace(/\D/g, "");
+  const c = digits.length >= 9 ? customerList.find((x) => x.key === toInternational($("phone").value)) : null;
+
+  hint.hidden = !c;
+  $("reward-row").hidden = true;
+  if (c) {
+    if (autofill && !$("customer").value.trim()) $("customer").value = c.name;
+
+    const parts = [`Returning customer: ${c.name}`, plural(c.visits, "visit")];
+    if (c.lastVisit) parts.push(`last visit ${fmtDate(c.lastVisit)}`);
+    if (c.favService) parts.push(`usually ${c.favService}` + (c.favStaff ? ` with ${c.favStaff}` : ""));
+    if (c.noShows) parts.push(plural(c.noShows, "no-show"));
+    hint.textContent = parts.join(" · ");
+
+    const loy = loyaltyFor(c.visits);
+    if (loy && loy.due) {
+      $("reward-label").textContent = `Loyalty reward: this will be visit number ${c.visits + 1}. Make it free.`;
+      $("reward-row").hidden = false;
+    }
+  }
+  applyReward();
 }
 
 // ======================================================================
@@ -557,6 +771,11 @@ function refreshStaffOptions() {
 }
 
 // Picking a service fills in its menu price and duration (you can still change them).
+function setPriceFromService() {
+  const s = services.find((x) => x.name === $("service").value);
+  if (s) $("price").value = s.price;
+}
+
 function syncFromService() {
   const s = services.find((x) => x.name === $("service").value);
   if (s) {
@@ -564,6 +783,15 @@ function syncFromService() {
     $("duration").value = s.duration;
   }
   refreshStaffOptions();
+  applyReward();
+}
+
+// A loyalty reward makes the visit free, so the price is locked at 0 while it's ticked.
+const rewardActive = () => !$("reward-row").hidden && $("reward").checked;
+function applyReward() {
+  const on = rewardActive();
+  $("price").readOnly = on;
+  if (on) $("price").value = 0;
 }
 
 function renderFormOptions() {
@@ -573,6 +801,7 @@ function renderFormOptions() {
 }
 
 function render() {
+  customerList = buildCustomers();
   $("booking-list").replaceChildren(...bookings.map(renderItem));
   $("empty").hidden = bookings.length > 0;
   renderStats();
@@ -583,6 +812,9 @@ function render() {
   renderStaffSetup();
   renderHours();
   renderFormOptions();
+  renderCustomers();
+  renderLoyaltySettings();
+  updateCustomerHint();
 }
 
 // ======================================================================
@@ -611,6 +843,7 @@ $("booking-form").addEventListener("submit", async (e) => {
       price: $("price").value,
       duration: $("duration").value,
       walkIn: $("walkin").checked,
+      reward: rewardActive(),
     });
   } catch (err) {
     console.error(err);
@@ -665,6 +898,23 @@ $("pay-form").addEventListener("submit", (e) => {
 });
 $("pay-cancel").addEventListener("click", () => $("pay-dialog").close());
 
+// Customers and loyalty
+$("phone").addEventListener("input", () => updateCustomerHint(true));
+$("reward").addEventListener("change", () => {
+  if (!$("reward").checked) setPriceFromService();
+  applyReward();
+});
+$("customer-search").addEventListener("input", renderCustomers);
+$("customer-filter").addEventListener("change", renderCustomers);
+$("loyalty-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const every = Number($("loyalty-every").value);
+  if (!Number.isInteger(every) || every < 0 || every === 1 || every > 50) {
+    return alert("Enter 0 to turn loyalty off, or a whole number from 2 to 50.");
+  }
+  run(() => store.saveSettings({ loyaltyEvery: every }));
+});
+
 // Report period
 $("report-range").addEventListener("change", (e) => {
   reportDays = Number(e.target.value);
@@ -672,4 +922,3 @@ $("report-range").addEventListener("change", (e) => {
 });
 
 refresh();
-

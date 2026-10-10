@@ -65,6 +65,11 @@
         <label>Phone (for WhatsApp)
           <input id="phone" required inputmode="tel" placeholder="0712 345 678" />
         </label>
+        <!-- Filled in by app.js when the phone number matches a returning customer -->
+        <p id="customer-hint" class="hint-box" hidden></p>
+        <label id="reward-row" class="check reward-row" hidden>
+          <input type="checkbox" id="reward" checked /> <span id="reward-label"></span>
+        </label>
         <label>Service
           <select id="service" required></select>
         </label>
@@ -92,6 +97,21 @@
       <h2>Your bookings</h2>
       <ul id="booking-list" class="list"></ul>
       <p id="empty" class="empty">No bookings yet. Add your first one above.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Customers</h2>
+      <div class="row">
+        <input id="customer-search" type="search" placeholder="Search by name or phone" aria-label="Search customers" />
+        <select id="customer-filter" aria-label="Filter customers">
+          <option value="all">Everyone</option>
+          <option value="regulars">Regulars (3+ visits)</option>
+          <option value="lapsed">Not seen in 30+ days</option>
+          <option value="reward">Free visit due</option>
+        </select>
+      </div>
+      <ul id="customer-list" class="list customers"></ul>
+      <p id="customers-empty" class="empty"></p>
     </section>
 
     <section class="panel">
@@ -124,6 +144,15 @@
         <label>Closes <input id="close" type="time" required /></label>
         <button type="submit">Save hours</button>
       </form>
+
+      <h3>Loyalty</h3>
+      <form id="loyalty-form" class="row">
+        <label>Every Nth visit is free
+          <input id="loyalty-every" type="number" min="0" max="50" required />
+        </label>
+        <button type="submit">Save</button>
+      </form>
+      <p class="hint">For example, 5 means a customer's 5th, 10th and 15th visits are free. Enter 0 to turn loyalty off.</p>
 
       <h3>Service menu</h3>
       <form id="service-form" class="row">

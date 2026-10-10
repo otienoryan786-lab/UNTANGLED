@@ -354,3 +354,37 @@ dialog {
 /* v6 fixes: stat cards sit in front of the header, and a larger logo */
 .stats { position: relative; z-index: 1; }
 .logo { width: clamp(72px, 20vw, 96px); }
+
+/* ---- v7: customers and loyalty ---- */
+.hint-box {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  background: #e6f2f2;
+  border: 1px solid #b9dbda;
+  font-size: 0.85rem;
+}
+.reward-row {
+  grid-column: 1 / -1;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  background: #fff6d6;
+  border: 1px solid #f0d77a;
+  font-weight: 600;
+}
+.customers { gap: 0.6rem; }
+.customer-card summary { cursor: pointer; list-style: none; position: relative; padding-right: 4.5rem; }
+.customer-card summary::-webkit-details-marker { display: none; }
+.customer-card summary::after { content: "Details ▾"; position: absolute; right: 0; top: 0.15rem; font-size: 0.75rem; color: #51657a; }
+.customer-card details[open] summary::after { content: "Hide ▴"; }
+.cust-top { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.customer-card .meta { margin: 0.15rem 0; }
+.cust-body { margin-top: 0.6rem; padding-top: 0.6rem; border-top: 1px solid var(--line); }
+.cust-body .actions { margin: 0.6rem 0; }
+.badge { font-size: 0.72rem; font-weight: 800; padding: 0.1rem 0.5rem; border-radius: 999px; }
+.badge.reward { background: var(--sun); color: var(--ink); box-shadow: 0 2px 0 #c79600; }
+.badge.lapsed { background: #e4eaef; color: var(--ink); box-shadow: 0 2px 0 var(--edge); }
+.history { margin: 0; padding-left: 1.1rem; font-size: 0.82rem; color: #3b4f62; }
+.history li { margin: 0.2rem 0; }
+#loyalty-form label { flex: 1 1 12rem; }

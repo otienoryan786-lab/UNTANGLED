@@ -17,7 +17,7 @@ const store = (() => {
     { name: "Shave", price: 150, duration: 15 },
     { name: "Haircut + shave", price: 400, duration: 45 },
   ];
-  const DEFAULT_SETTINGS = { open: "08:00", close: "19:00" };
+  const DEFAULT_SETTINGS = { open: "08:00", close: "19:00", loyaltyEvery: 5 }; // loyaltyEvery: every Nth visit is free (0 = off)
 
   // ---- low-level read/write -------------------------------------------
   function read(key, fallback) {
@@ -46,8 +46,9 @@ const store = (() => {
       staff: firstStaff,
       status: "booked",
       duration: 30,
-      payMethod: null, // "cash" | "mpesa" | null
+      payMethod: null, // "cash" | "mpesa" | "loyalty" | null
       mpesaCode: "",
+      reward: false, // true when this visit was a free loyalty visit
       ...b,
     }));
   };
