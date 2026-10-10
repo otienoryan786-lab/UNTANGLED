@@ -181,3 +181,176 @@ label.inline { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0
 .bar-fill.busy { background: var(--teal); }
 .bar-fill.quiet { background: var(--sun); }
 .bar-val { text-align: right; min-width: 3rem; }
+
+/* =====================================================================
+   v6: depth ("3D") polish + brand header
+   Everything below overrides earlier rules, so the layout stays the same.
+   ===================================================================== */
+:root {
+  --teal-top: #0e8180;      /* white text on this is 4.6:1, so it stays readable */
+  --teal-deep: #0b6c6b;
+  --teal-edge: #08504f;     /* the "thickness" under raised buttons */
+  --edge: #b9c6d0;
+  --shadow-raised: 0 1px 0 rgba(255, 255, 255, 0.95) inset,
+                   0 2px 3px rgba(22, 40, 58, 0.08),
+                   0 14px 26px -12px rgba(22, 40, 58, 0.32);
+}
+
+body {
+  background-color: var(--paper);
+  background-image: linear-gradient(180deg, #dfe8ee 0, var(--paper) 520px);
+  background-repeat: no-repeat;
+}
+
+/* ---- Brand header ---- */
+.top {
+  position: relative;
+  padding: 1.25rem 1rem 3.4rem;
+  background:
+    radial-gradient(700px 260px at 88% -30%, rgba(14, 129, 128, 0.6), transparent 65%),
+    linear-gradient(180deg, #1d3b57, #11202e);
+  border-bottom: 4px solid var(--sun);
+  box-shadow: 0 12px 24px -12px rgba(22, 40, 58, 0.7);
+}
+.brand {
+  max-width: calc(760px - 2rem);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.logo {
+  flex: none;
+  width: clamp(60px, 17vw, 88px);
+  height: auto;
+  filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.45));
+}
+/* Extruded lettering: stacked shadows build a solid edge behind the white text */
+.wordmark {
+  margin: 0;
+  font-size: clamp(1.9rem, 8vw, 3rem);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  text-shadow:
+    0 1px 0 #139b99, 0 2px 0 #0f8786, 0 3px 0 #0c7271,
+    0 4px 0 #095e5d, 0 5px 0 #08504f,
+    0 10px 14px rgba(0, 0, 0, 0.45);
+}
+.top p { margin: 0.5rem 0 0; font-size: 0.9rem; }
+
+/* The thread draws itself once on load: tangled, then untangled */
+@media (prefers-reduced-motion: no-preference) {
+  .thread { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 1.6s 0.15s ease-out forwards; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+}
+
+/* ---- Raised cards ---- */
+.panel {
+  border-radius: 14px;
+  border-color: #cfd9e0;
+  border-bottom-color: var(--edge);
+  background: linear-gradient(180deg, #ffffff, #f7fafb);
+  box-shadow: var(--shadow-raised);
+}
+.stats div {
+  border-radius: 12px;
+  border-color: #cfd9e0;
+  border-bottom: 3px solid var(--edge);
+  background: linear-gradient(180deg, #ffffff, #f1f6f8);
+  box-shadow: 0 1px 0 #fff inset, 0 12px 20px -10px rgba(22, 40, 58, 0.5);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.stats span { text-shadow: 0 1px 0 #fff; }
+
+.item {
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff, #f9fbfc);
+  box-shadow: 0 1px 0 #fff inset, 0 2px 3px rgba(22, 40, 58, 0.08), 0 10px 18px -12px rgba(22, 40, 58, 0.35);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.staff-card {
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff, #f7fafb);
+  box-shadow: 0 1px 0 #fff inset, 0 8px 14px -10px rgba(22, 40, 58, 0.35);
+}
+.chip {
+  background: linear-gradient(180deg, #ffffff, #eef3f6);
+  box-shadow: 0 1px 0 #fff inset, 0 2px 0 var(--edge);
+}
+.item.no-show { box-shadow: none; }
+
+/* Lift on hover (mouse only, and only if motion is welcome) */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .stats div:hover { transform: perspective(600px) translateY(-3px) rotateX(5deg); }
+  .item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 1px 0 #fff inset, 0 3px 4px rgba(22, 40, 58, 0.1), 0 18px 26px -14px rgba(22, 40, 58, 0.45);
+  }
+}
+
+/* ---- Keycap buttons: a solid edge underneath that presses down ---- */
+button, .btn {
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--teal-top), var(--teal-deep));
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.25);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.28) inset,
+              0 4px 0 var(--teal-edge),
+              0 10px 14px -6px rgba(8, 80, 79, 0.55);
+  transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.15s ease;
+}
+button:hover, .btn:hover { filter: brightness(1.07); }
+button:active, .btn:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.28) inset, 0 1px 0 var(--teal-edge), 0 3px 6px -3px rgba(8, 80, 79, 0.55);
+}
+
+button.ghost, button.danger {
+  background: linear-gradient(180deg, #ffffff, #edf2f5);
+  text-shadow: none;
+  box-shadow: 0 1px 0 #fff inset, 0 3px 0 var(--edge), 0 8px 12px -6px rgba(22, 40, 58, 0.35);
+}
+button.ghost:active, button.danger:active {
+  box-shadow: 0 1px 0 #fff inset, 0 0 0 var(--edge), 0 2px 4px -2px rgba(22, 40, 58, 0.35);
+}
+button.danger { color: var(--danger); }
+
+/* The small "x" on chips stays flat */
+.chip-x, .chip-x:hover, .chip-x:active {
+  background: transparent;
+  box-shadow: none;
+  text-shadow: none;
+  transform: none;
+  filter: none;
+}
+.actions { gap: 0.75rem 0.5rem; padding-bottom: 4px; }
+.staff-head button { margin-bottom: 3px; }
+form > button[type="submit"] { margin-bottom: 4px; }
+
+/* ---- Recessed fields: inputs look pressed into the card ---- */
+input:not([type="checkbox"]), select {
+  border-radius: 8px;
+  border-color: #c3cfd8;
+  background: linear-gradient(180deg, #eff4f7, #ffffff 45%);
+  box-shadow: inset 0 2px 4px rgba(22, 40, 58, 0.12);
+}
+input:focus-visible, select:focus-visible { box-shadow: inset 0 2px 4px rgba(22, 40, 58, 0.12); }
+
+/* ---- Chart bars as little cylinders ---- */
+.bar { box-shadow: inset 0 2px 3px rgba(22, 40, 58, 0.2); }
+.bar-fill {
+  background: linear-gradient(180deg, #b3dbda, #72b3b2 55%, #5b9a99);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+}
+.bar-fill.busy  { background: linear-gradient(180deg, #1eaaa8, #0e7c7b 55%, #0a6261); }
+.bar-fill.quiet { background: linear-gradient(180deg, #ffd95f, #f2b705 55%, #d09b00); }
+
+/* ---- Dialog floats above everything ---- */
+dialog {
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffffff, #f4f8fa);
+  box-shadow: 0 1px 0 #fff inset, 0 30px 60px -15px rgba(10, 25, 40, 0.65);
+}
+
+/* v6 fixes: stat cards sit in front of the header, and a larger logo */
+.stats { position: relative; z-index: 1; }
+.logo { width: clamp(72px, 20vw, 96px); }

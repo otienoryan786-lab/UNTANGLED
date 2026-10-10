@@ -7,12 +7,40 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&display=swap" rel="stylesheet" />
+  <meta name="theme-color" content="#16283a" />
+  <link rel="icon" type="image/svg+xml" href="logo.svg" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <header class="top">
-    <h1>Untangled</h1>
-    <p>Bookings, payments and customers for your salon or barbershop.</p>
+    <div class="brand">
+    <svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" aria-hidden="true" focusable="false">
+      <defs>
+        <linearGradient id="badge" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#2b4d6e"/><stop offset="1" stop-color="#0f1e2c"/>
+        </linearGradient>
+        <linearGradient id="rope" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#34cfcc"/><stop offset=".6" stop-color="#119291"/><stop offset="1" stop-color="#0b6c6b"/>
+        </linearGradient>
+        <radialGradient id="bead" cx=".35" cy=".3" r=".85">
+          <stop offset="0" stop-color="#fff0a8"/><stop offset=".55" stop-color="#f2b705"/><stop offset="1" stop-color="#b98700"/>
+        </radialGradient>
+      </defs>
+      <rect x="4" y="7" width="88" height="86" rx="22" fill="#000" opacity=".28"/>
+      <rect x="4" y="3" width="88" height="86" rx="22" fill="url(#badge)"/>
+      <rect x="5" y="4" width="86" height="84" rx="21" fill="none" stroke="#fff" stroke-opacity=".2"/>
+      <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path class="thread" pathLength="1" d="M16 54 C8 27 41 17 40 39 C39 58 17 54 23 38 C29 24 51 32 46 47 C44 54 49 56 56 52 C59 50.5 61 50 66 50 L80 50" stroke="#000" stroke-opacity=".35" stroke-width="8" transform="translate(0 3)"/>
+        <path class="thread" pathLength="1" d="M16 54 C8 27 41 17 40 39 C39 58 17 54 23 38 C29 24 51 32 46 47 C44 54 49 56 56 52 C59 50.5 61 50 66 50 L80 50" stroke="url(#rope)" stroke-width="8"/>
+        <path class="thread" pathLength="1" d="M16 54 C8 27 41 17 40 39 C39 58 17 54 23 38 C29 24 51 32 46 47 C44 54 49 56 56 52 C59 50.5 61 50 66 50 L80 50" stroke="#fff" stroke-opacity=".4" stroke-width="2" transform="translate(0 -2)"/>
+      </g>
+      <circle cx="82" cy="50" r="6.5" fill="url(#bead)"/>
+    </svg>
+      <div>
+        <h1 class="wordmark">Untangled</h1>
+        <p>Bookings, payments and customers for your salon or barbershop.</p>
+      </div>
+    </div>
   </header>
 
   <main>
@@ -141,4 +169,3 @@
   <script src="app.js"></script>
 </body>
 </html>
-
