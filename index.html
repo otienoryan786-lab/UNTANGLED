@@ -9,6 +9,11 @@
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&display=swap" rel="stylesheet" />
   <meta name="theme-color" content="#16283a" />
   <link rel="icon" type="image/svg+xml" href="logo.svg" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Untangled" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -49,6 +54,15 @@
       <div><span id="stat-unpaid">KES 0</span> still unpaid</div>
       <div><span id="stat-paid">KES 0</span> collected</div>
     </section>
+
+    <!-- Shown by pwa.js only when the app can be installed -->
+    <div id="install-box" class="hint-box install-box" hidden>
+      <span id="install-text"></span>
+      <span class="actions">
+        <button id="install-btn" type="button" hidden>Install</button>
+        <button id="install-later" type="button" class="ghost small">Not now</button>
+      </span>
+    </div>
 
     <section class="panel">
       <h2>Today by staff</h2>
@@ -196,5 +210,6 @@
 
   <script src="store.js"></script>
   <script src="app.js"></script>
+  <script src="pwa.js"></script>
 </body>
 </html>
