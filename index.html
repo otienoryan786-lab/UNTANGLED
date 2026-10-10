@@ -66,6 +66,27 @@
       <p id="empty" class="empty">No bookings yet. Add your first one above.</p>
     </section>
 
+    <section class="panel">
+      <h2>Busy and quiet days</h2>
+      <label class="inline">Show
+        <select id="report-range">
+          <option value="7">the last 7 days</option>
+          <option value="30" selected>the last 30 days</option>
+          <option value="90">the last 90 days</option>
+        </select>
+      </label>
+      <p id="report-empty" class="empty">No bookings in this period yet. Once you have a few days of bookings, your busy and quiet times will show here.</p>
+      <div id="report-body" hidden>
+        <ul id="report-summary" class="facts"></ul>
+        <h3>By day of the week</h3>
+        <p class="hint">Average bookings per day, and average booked value per day</p>
+        <ul id="report-weekdays" class="bars"></ul>
+        <h3>By hour of the day</h3>
+        <p class="hint">Bookings that started in each hour</p>
+        <ul id="report-hours" class="bars"></ul>
+      </div>
+    </section>
+
     <details class="panel">
       <summary>Set up staff, services and hours</summary>
 
@@ -120,3 +141,4 @@
   <script src="app.js"></script>
 </body>
 </html>
+

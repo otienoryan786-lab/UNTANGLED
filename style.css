@@ -166,3 +166,18 @@ dialog .meta { margin: 0; }
 #hours-form { align-items: flex-end; }
 #hours-form label { flex: 1 1 7rem; }
 
+/* ---- v5: busy and quiet days report ---- */
+label.inline { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+.facts { margin: 0 0 0.5rem; padding-left: 1.1rem; font-size: 0.9rem; }
+.facts li { margin: 0.15rem 0; }
+.hint { margin: -0.25rem 0 0.5rem; font-size: 0.8rem; color: #51657a; }
+.panel h3 { margin: 1rem 0 0.4rem; font-size: 0.95rem; }
+
+.bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
+.bar-row { display: grid; grid-template-columns: 3.4rem 1fr 8.5rem; align-items: center; gap: 0.5rem; font-size: 0.82rem; }
+.bar-label { font-weight: 600; }
+.bar { background: var(--paper); border-radius: 4px; height: 0.9rem; overflow: hidden; }
+.bar-fill { height: 100%; background: #86bdbc; border-radius: 4px; min-width: 2px; }
+.bar-fill.busy { background: var(--teal); }
+.bar-fill.quiet { background: var(--sun); }
+.bar-val { text-align: right; min-width: 3rem; }

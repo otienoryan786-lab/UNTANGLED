@@ -330,6 +330,151 @@ function renderTakings() {
 }
 
 // ======================================================================
+// Report: busy and quiet days
+// ======================================================================
+
+let reportDays = 30;
+const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0]; // show Monday first
+const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const hourLabel = (h) =>
+  new Date(2000, 0, 1, h).toLocaleTimeString("en-KE", { hour: "numeric", hour12: true });
+
+// Works out the numbers for the last `days` days. Returns null if there's nothing to show.
+function buildReport(days) {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const endToday = new Date(todayStart);
+  endToday.setDate(endToday.getDate() + 1);
+  const rangeStart = new Date(todayStart);
+  rangeStart.setDate(rangeStart.getDate() - (days - 1));
+
+  const inRange = bookings.filter(
+    (b) => startMs(b) >= rangeStart.getTime() && startMs(b) < endToday.getTime()
+  );
+  if (!inRange.length) return null;
+
+  // Days before the first booking in this period are ignored, so a shop that
+  // only just started using the app doesn't see empty days counted as "quiet".
+  const first = new Date(Math.min(...inRange.map(startMs)));
+  first.setHours(0, 0, 0, 0);
+
+  const occurrences = Array(7).fill(0); // how many Mondays, Tuesdays... in the period
+  let totalDays = 0;
+  for (let d = new Date(first); d <= todayStart; d.setDate(d.getDate() + 1)) {
+    occurrences[d.getDay()]++;
+    totalDays++;
+  }
+
+  const live = inRange.filter((b) => b.status !== "no-show");
+  const noShows = inRange.length - live.length;
+
+  const weekdays = WEEK_ORDER.map((wd) => {
+    const mine = live.filter((b) => new Date(b.when).getDay() === wd);
+    const occ = occurrences[wd];
+    return {
+      wd,
+      avg: occ ? mine.length / occ : null,
+      value: occ ? mine.reduce((s, b) => s + b.price, 0) / occ : null,
+    };
+  });
+
+  const hourCounts = {};
+  for (const b of live) {
+    const h = new Date(b.when).getHours();
+    hourCounts[h] = (hourCounts[h] || 0) + 1;
+  }
+  const booked = Object.keys(hourCounts).map(Number);
+  const [openH] = settings.open.split(":").map(Number);
+  const [closeH, closeM] = settings.close.split(":").map(Number);
+  const minH = Math.min(openH, ...booked);
+  const maxH = Math.max(closeM ? closeH : closeH - 1, ...booked);
+  const hours = [];
+  for (let h = minH; h <= maxH; h++) hours.push({ h, count: hourCounts[h] || 0 });
+
+  return { total: live.length, noShows, noShowRate: noShows / inRange.length, totalDays, weekdays, hours };
+}
+
+// Finds the highest and lowest row by `key`. Returns {} when there's no clear difference.
+function extremes(rows, key) {
+  const valid = rows.filter((r) => r[key] !== null);
+  if (!valid.length) return {};
+  const max = Math.max(...valid.map((r) => r[key]));
+  const min = Math.min(...valid.map((r) => r[key]));
+  if (max === min) return {};
+  return { busiest: valid.find((r) => r[key] === max), quietest: valid.find((r) => r[key] === min) };
+}
+
+// Draws a simple bar chart out of divs. rows: [{ label, value, text, kind }]
+function renderBars(list, rows) {
+  const max = Math.max(0, ...rows.map((r) => r.value));
+  list.replaceChildren(
+    ...rows.map((r) => {
+      const li = el("li", "bar-row");
+      li.append(el("span", "bar-label", r.label));
+      const track = el("div", "bar");
+      const fill = el("div", "bar-fill" + (r.kind ? " " + r.kind : ""));
+      fill.style.width = (max ? (r.value / max) * 100 : 0) + "%";
+      track.append(fill);
+      li.append(track);
+      li.append(el("span", "bar-val", r.text));
+      return li;
+    })
+  );
+}
+
+function renderReport() {
+  const r = buildReport(reportDays);
+  $("report-empty").hidden = !!r;
+  $("report-body").hidden = !r;
+  if (!r) return;
+
+  const wk = extremes(r.weekdays, "avg");
+  const hr = extremes(r.hours, "count");
+  const tag = (row, ext) =>
+    row === ext.busiest ? " · busiest" : row === ext.quietest ? " · quietest" : "";
+  const kind = (row, ext) =>
+    row === ext.busiest ? "busy" : row === ext.quietest ? "quiet" : "";
+
+  const facts = [
+    `${r.total} bookings over ${r.totalDays} day${r.totalDays === 1 ? "" : "s"} (about ${(r.total / r.totalDays).toFixed(1)} a day)`,
+    `${r.noShows} no-show${r.noShows === 1 ? "" : "s"} (${Math.round(r.noShowRate * 100)}% of bookings)`,
+  ];
+  if (wk.busiest) {
+    facts.push(
+      `Busiest day: ${WEEKDAY_NAMES[wk.busiest.wd]}`,
+      `Quietest day: ${WEEKDAY_NAMES[wk.quietest.wd]}`
+    );
+  }
+  if (hr.busiest) {
+    facts.push(`Peak hour: ${hourLabel(hr.busiest.h)}`, `Quietest hour: ${hourLabel(hr.quietest.h)}`);
+  }
+  $("report-summary").replaceChildren(...facts.map((f) => el("li", "", f)));
+
+  renderBars(
+    $("report-weekdays"),
+    r.weekdays.map((row) => ({
+      label: WEEKDAY_NAMES[row.wd].slice(0, 3),
+      value: row.avg || 0,
+      text:
+        row.avg === null
+          ? "no data"
+          : `${row.avg.toFixed(1)} · ${kes(Math.round(row.value))}${tag(row, wk)}`,
+      kind: kind(row, wk),
+    }))
+  );
+
+  renderBars(
+    $("report-hours"),
+    r.hours.map((row) => ({
+      label: hourLabel(row.h),
+      value: row.count,
+      text: `${row.count}${tag(row, hr)}`,
+      kind: kind(row, hr),
+    }))
+  );
+}
+
+// ======================================================================
 // Rendering: setup panel
 // ======================================================================
 
@@ -433,6 +578,7 @@ function render() {
   renderStats();
   renderStaffSummary();
   renderTakings();
+  renderReport();
   renderServiceSetup();
   renderStaffSetup();
   renderHours();
@@ -519,4 +665,11 @@ $("pay-form").addEventListener("submit", (e) => {
 });
 $("pay-cancel").addEventListener("click", () => $("pay-dialog").close());
 
+// Report period
+$("report-range").addEventListener("change", (e) => {
+  reportDays = Number(e.target.value);
+  renderReport();
+});
+
 refresh();
+
